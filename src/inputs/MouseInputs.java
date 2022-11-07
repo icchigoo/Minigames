@@ -16,20 +16,17 @@ public class MouseInputs implements MouseListener, MouseMotionListener {
 
 	@Override
 	public void mouseDragged(MouseEvent e) {
-	// TODO Auto-generated method stub
+		// TODO Auto-generated method stub
 
 	}
 
 	@Override
 	public void mouseMoved(MouseEvent e) {
-	
 
 	}
 
 	@Override
 	public void mouseClicked(MouseEvent e) {
-
-		
 
 	}
 
