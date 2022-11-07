@@ -2,6 +2,9 @@ package main;
 
 public class Game implements Runnable {
 
+
+	//creating game loop to run chracter and render and to know about the fps of the game 
+
 	private GameWindow gameWindow;
 	private GamePanel gamePanel;
 	private Thread gameThread;
