@@ -1,25 +1,36 @@
 package entities;
 
 import static utilz.Constants.PlayerConstants.*;
-
+import static utilz.HelpMethods.*;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
 
-import javax.imageio.ImageIO;
+import main.Game;
+import utilz.LoadSave;
 
 public class Player extends Entity {
 	private BufferedImage[][] animations;
 	private int aniTick, aniIndex, aniSpeed = 25;
 	private int playerAction = IDLE;
 	private boolean moving = false, attacking = false;
-	private boolean left, up, right, down;
-	private float playerSpeed = 2.0f;
+	private boolean left, up, right, down, jump;
+	private float playerSpeed = 1.0f * Game.SCALE;
+	private int[][] lvlData;
+	private float xDrawOffset = 21 * Game.SCALE;
+	private float yDrawOffset = 4 * Game.SCALE;
 
-	public Player(float x, float y) {
-		super(x, y);
+	// Jumping / Gravity
+	private float airSpeed = 0f;
+	private float gravity = 0.04f * Game.SCALE;
+	private float jumpSpeed = -2.25f * Game.SCALE;
+	private float fallSpeedAfterCollision = 0.5f * Game.SCALE;
+	private boolean inAir = false;
+
+	public Player(float x, float y, int width, int height) {
+		super(x, y, width, height);
 		loadAnimations();
+		initHitbox(x, y, (int) (20 * Game.SCALE), (int) (27 * Game.SCALE));
+
 	}
 
 	public void update() {
@@ -28,8 +39,9 @@ public class Player extends Entity {
 		setAnimation();
 	}
 
-	public void render(Graphics g) {
-		g.drawImage(animations[playerAction][aniIndex], (int) x, (int) y, 256, 160, null);
+	public void render(Graphics g, int lvlOffset) {
+		g.drawImage(animations[playerAction][aniIndex], (int) (hitbox.x - xDrawOffset) - lvlOffset, (int) (hitbox.y - yDrawOffset), width, height, null);
+//		drawHitbox(g);
 	}
 
 	private void updateAnimationTick() {
@@ -54,6 +66,13 @@ public class Player extends Entity {
 		else
 			playerAction = IDLE;
 
+		if (inAir) {
+			if (airSpeed < 0)
+				playerAction = JUMP;
+			else
+				playerAction = FALLING;
+		}
+
 		if (attacking)
 			playerAction = ATTACK_1;
 
@@ -69,42 +88,82 @@ public class Player extends Entity {
 	private void updatePos() {
 		moving = false;
 
-		if (left && !right) {
-			x -= playerSpeed;
-			moving = true;
-		} else if (right && !left) {
-			x += playerSpeed;
-			moving = true;
+		if (jump)
+			jump();
+
+		if (!inAir)
+			if ((!left && !right) || (right && left))
+				return;
+
+		float xSpeed = 0;
+
+		if (left)
+			xSpeed -= playerSpeed;
+		if (right)
+			xSpeed += playerSpeed;
+
+		if (!inAir)
+			if (!IsEntityOnFloor(hitbox, lvlData))
+				inAir = true;
+
+		if (inAir) {
+			if (CanMoveHere(hitbox.x, hitbox.y + airSpeed, hitbox.width, hitbox.height, lvlData)) {
+				hitbox.y += airSpeed;
+				airSpeed += gravity;
+				updateXPos(xSpeed);
+			} else {
+				hitbox.y = GetEntityYPosUnderRoofOrAboveFloor(hitbox, airSpeed);
+				if (airSpeed > 0)
+					resetInAir();
+				else
+					airSpeed = fallSpeedAfterCollision;
+				updateXPos(xSpeed);
+			}
+
+		} else
+			updateXPos(xSpeed);
+		moving = true;
+	}
+
+	private void jump() {
+		if (inAir)
+			return;
+		inAir = true;
+		airSpeed = jumpSpeed;
+
+	}
+
+	private void resetInAir() {
+		inAir = false;
+		airSpeed = 0;
+
+	}
+
+	private void updateXPos(float xSpeed) {
+		if (CanMoveHere(hitbox.x + xSpeed, hitbox.y, hitbox.width, hitbox.height, lvlData)) {
+			hitbox.x += xSpeed;
+		} else {
+			hitbox.x = GetEntityXPosNextToWall(hitbox, xSpeed);
 		}
 
-		if (up && !down) {
-			y -= playerSpeed;
-			moving = true;
-		} else if (down && !up) {
-			y += playerSpeed;
-			moving = true;
-		}
 	}
 
 	private void loadAnimations() {
-		InputStream is = getClass().getResourceAsStream("/player_sprites.png");
-		try {
-			BufferedImage img = ImageIO.read(is);
 
-			animations = new BufferedImage[9][6];
-			for (int j = 0; j < animations.length; j++)
-				for (int i = 0; i < animations[j].length; i++)
-					animations[j][i] = img.getSubimage(i * 64, j * 40, 64, 40);
+		BufferedImage img = LoadSave.GetSpriteAtlas(LoadSave.PLAYER_ATLAS);
 
-		} catch (IOException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				is.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+		animations = new BufferedImage[9][6];
+		for (int j = 0; j < animations.length; j++)
+			for (int i = 0; i < animations[j].length; i++)
+				animations[j][i] = img.getSubimage(i * 64, j * 40, 64, 40);
+
+	}
+
+	public void loadLvlData(int[][] lvlData) {
+		this.lvlData = lvlData;
+		if (!IsEntityOnFloor(hitbox, lvlData))
+			inAir = true;
+
 	}
 
 	public void resetDirBooleans() {
@@ -148,6 +207,10 @@ public class Player extends Entity {
 
 	public void setDown(boolean down) {
 		this.down = down;
+	}
+
+	public void setJump(boolean jump) {
+		this.jump = jump;
 	}
 
 }
